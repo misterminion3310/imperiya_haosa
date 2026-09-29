@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Империя Хаоса</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <section id="loadingScreen" class="screen loading-screen">
+      <div class="loading-logo">ИМПЕРИЯ ХАОСА</div>
+      <div class="loader"><span></span></div>
+      <div class="loading-caption">Загрузка империи...</div>
+    </section>
+
+    <section id="menuScreen" class="screen hidden">
+      <div class="menu-panel">
+        <div class="eyebrow">GLOBAL STRATEGY</div>
+        <h1>Империя<br><span>Хаоса</span></h1>
+        <p>Построй промышленность. Развивай технологии. Создай армию и флот.</p>
+        <button id="playBtn" class="primary-btn">Играть</button>
+      </div>
+    </section>
+
+    <section id="setupScreen" class="screen hidden">
+      <div class="setup-panel">
+        <div class="eyebrow">НОВАЯ КАМПАНИЯ</div>
+        <h2>Выбор страны</h2>
+        <div class="country-search"><input id="countrySearch" type="search" placeholder="Поиск страны..."></div><div id="countryCount" class="country-count"></div><div id="countryGrid" class="country-grid"></div>
+
+        <div class="setup-footer">
+          <div id="setupHint">Выберите страну</div>
+          <button id="startGameBtn" class="primary-btn" disabled>Продолжить</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="tutorialScreen" class="screen hidden">
+      <div class="tutorial-panel">
+        <div class="eyebrow">ОБУЧЕНИЕ</div>
+        <h2>Как играть</h2>
+        <div id="tutorialCountry" class="tutorial-country"></div>
+        <p class="tutorial-intro">Короткий туториал перед началом кампании.</p>
+        <div class="tutorial-steps">
+          <div class="tutorial-step"><span>1</span><div><b>Развивайте страну</b><small>Покупайте заводы, технологии, армию и флот за деньги.</small></div></div>
+          <div class="tutorial-step"><span>2</span><div><b>Следите за ресурсами</b><small>Верхняя панель показывает деньги, промышленность, технологии, армию и флот.</small></div></div>
+          <div class="tutorial-step"><span>3</span><div><b>Дипломатия</b><small>Заключайте альянсы или включайте военное положение.</small></div></div>
+          <div class="tutorial-step"><span>4</span><div><b>Мировая карта</b><small>Нажимайте на территории и изучайте страны. Ваша территория подсвечена отдельно.</small></div></div>
+          <div class="tutorial-step"><span>5</span><div><b>Военная подготовка</b><small>Открывайте тренировку и поражайте появляющиеся цели разным оружием.</small></div></div>
+          <div class="tutorial-step"><span>6</span><div><b>Покупки</b><small>В магазине можно приобрести оружие, корабли и лаборатории.</small></div></div>
+        </div>
+        <button id="finishTutorialBtn" class="primary-btn">Начать игру</button>
+      </div>
+    </section>
+
+    <section id="gameScreen" class="game-screen hidden">
+      <header class="topbar">
+        <div class="brand">ИМПЕРИЯ <span>ХАОСА</span></div>
+        <div class="resources">
+          <div><b>₽</b><span id="moneyValue">1200</span></div>
+          <div><b>⚙</b><span id="industryValue">20</span></div>
+          <div><b>⚡</b><span id="techValue">10</span></div>
+          <div><b>⚔</b><span id="armyValue">5</span></div>
+          <div><b>⚓</b><span id="fleetValue">2</span></div>
+        </div>
+        <button id="resetBtn" class="reset-btn">↻ Сменить страну</button>
+      </header>
+
+      <main class="game-layout">
+        <aside class="left-panel panel">
+          <div class="nation-card">
+            <div id="flag" class="flag">◆</div>
+            <div>
+              <div class="muted">ВАША ИМПЕРИЯ</div>
+              <h3 id="nationName">—</h3>
+              <small id="epochName">—</small>
+            </div>
+          </div>
+
+          <div class="panel-title">Развитие</div>
+          <button class="action-card" data-action="factory">
+            <span class="action-icon">⚙</span><span><b>Заводы</b><small>+промышленность</small></span><strong>+5</strong>
+          </button>
+          <button class="action-card" data-action="tech">
+            <span class="action-icon">⚡</span><span><b>Технологии</b><small>+технологии</small></span><strong>+4</strong>
+          </button>
+          <button class="action-card" data-action="army">
+            <span class="action-icon">⚔</span><span><b>Армия</b><small>+военная сила</small></span><strong>+2</strong>
+          </button>
+          <button class="action-card" data-action="fleet">
+            <span class="action-icon">⚓</span><span><b>Флот</b><small>+морская сила</small></span><strong>+1</strong>
+          </button>
+
+          <div class="panel-title">Дипломатия</div>
+          <button id="allianceBtn" class="wide-btn">🤝 Предложить альянс</button>
+          <button id="warBtn" class="wide-btn danger">⚔ Начать войну</button>
+        </aside>
+
+        <section class="map-panel panel">
+          <div class="map-header">
+            <div>
+              <div class="muted">МИРОВАЯ КАРТА</div>
+              <h2 id="mapTitle">Мир</h2>
+            </div>
+            <div class="status-chip" id="statusChip">МИР</div>
+          </div>
+          <div class="world-map-wrap">
+            <svg id="worldMap" viewBox="0 0 1000 560" aria-label="Настоящая карта мира">
+              <rect width="1000" height="560" class="ocean"/>
+              <g id="territories"></g>
+            </svg>
+            <div class="map-legend"><span class="legend-own"></span> Ваша территория <span class="legend-other"></span> Другие страны</div>
+          </div>
+        </section>
+
+        <aside class="right-panel">
+          <div class="panel panel-card">
+            <div class="panel-title">Империя</div>
+            <div class="stat"><span>Промышленность</span><b id="industryStat">20</b></div>
+            <div class="stat"><span>Технологии</span><b id="techStat">10</b></div>
+            <div class="stat"><span>Армия</span><b id="armyStat">5</b></div>
+            <div class="stat"><span>Флот</span><b id="fleetStat">2</b></div>
+          </div>
+
+          <div class="panel panel-card">
+            <div class="panel-title">Магазин</div>
+            <button class="shop-item" data-buy="weapon"><span>🎯</span><div><b>Оружейный набор</b><small>для тренировок</small></div><strong>250 ₽</strong></button>
+            <button class="shop-item" data-buy="ship"><span>🚢</span><div><b>Малый корабль</b><small>+1 флот</small></div><strong>500 ₽</strong></button>
+            <button class="shop-item" data-buy="lab"><span>🔬</span><div><b>Лаборатория</b><small>+5 технологий</small></div><strong>650 ₽</strong></button>
+          </div>
+
+          <div class="panel panel-card">
+            <div class="panel-title">Военная подготовка</div>
+            <p class="small-text">Попадайте по целям разным оружием.</p>
+            <button id="trainingBtn" class="primary-btn small">Открыть полигон</button>
+          </div>
+
+          <div id="logPanel" class="panel log-panel">
+            <div class="panel-title">События</div>
+            <div id="eventLog"></div>
+          </div>
+        </aside>
+      </main>
+    </section>
+
+    <div id="trainingModal" class="modal hidden">
+      <div class="modal-window training-window">
+        <button class="modal-close" id="closeTraining">×</button>
+        <div class="eyebrow">ВОЕННЫЙ ПОЛИГОН</div>
+        <h2>Тренировка армии</h2>
+        <p>Выбери оружие и нажимай по появляющимся мишеням.</p>
+        <div class="weapon-row">
+          <button class="weapon active" data-weapon="pistol">Пистолет</button>
+          <button class="weapon" data-weapon="rifle">Винтовка</button>
+          <button class="weapon" data-weapon="cannon">Пушка</button>
+        </div>
+        <div id="range" class="range">
+          <div class="range-hud">Попаданий: <b id="hits">0</b> / 10</div>
+          <button id="target" class="target hidden">◎</button>
+          <div id="trainingMessage" class="range-message">Нажмите «Старт тренировки»</div>
+        </div>
+        <button id="startTraining" class="primary-btn">Старт тренировки</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/worldMapData.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/training.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
