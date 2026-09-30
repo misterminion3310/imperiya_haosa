@@ -5,6 +5,113 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Империя Хаоса</title>
   <link rel="stylesheet" href="css/style.css">
+<style id="mini-tutorial-styles">
+.tutorial-tip{display:flex;gap:10px;align-items:flex-start;margin:18px 0 20px;padding:14px 16px;border-radius:12px;background:rgba(255,193,7,.08);border:1px solid rgba(255,193,7,.20)}
+.tutorial-tip span{opacity:.82;line-height:1.45}
+.tutorial-step small{line-height:1.45}
+@media(max-width:700px){.tutorial-tip{flex-direction:column;gap:4px}}
+</style>
+<style id="economy-map-patch">
+/* Названия стран на карте скрыты, территории и клики остаются. */
+#territories text, #territories .country-label, #territories .territory-label, #territories .label { display:none !important; }
+</style>
+
+<style id="hide-map-flags">
+/* Флаги стран на мировой карте скрыты. Территории и клики остаются. */
+#worldMap .country-flag,
+#worldMap .territory-flag,
+#worldMap .flag,
+#worldMap .map-flag,
+#worldMap image,
+#worldMap .flag-label,
+#worldMap .country-icon { display:none !important; }
+</style>
+
+<style id="remove-map-black-boxes">
+/* Убираем чёрные прямоугольники/фоны, которые добавляются поверх карты. */
+#worldMap #territories rect,
+#worldMap .country-box,
+#worldMap .territory-box,
+#worldMap .country-background,
+#worldMap .map-label-bg,
+#worldMap .label-background,
+#worldMap .flag-background {
+  display: none !important;
+}
+</style>
+
+<style id="country-info-styles">
+.country-info-panel{margin-top:12px;padding:16px 18px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(10,14,20,.82);color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.22)}
+.country-info-panel.hidden{display:none}
+.country-info-panel .country-info-title{font-size:18px;font-weight:800;margin-bottom:8px}
+.country-info-panel .country-info-text{font-size:13px;line-height:1.5;opacity:.82}
+.country-info-panel .country-info-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.country-info-panel .country-info-stat{padding:9px;border-radius:10px;background:rgba(255,255,255,.05)}
+.country-info-panel .country-info-stat small{display:block;opacity:.6;font-size:10px;margin-bottom:3px}
+.country-info-panel .country-info-stat b{font-size:14px}
+@media(max-width:700px){.country-info-panel .country-info-grid{grid-template-columns:1fr 1fr}}
+</style>
+
+
+<style id="war-system-styles">
+.war-panel{margin-top:12px;padding:16px 18px;border:1px solid rgba(255,90,90,.25);border-radius:14px;background:linear-gradient(180deg,rgba(45,15,18,.88),rgba(12,14,20,.9));color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.22)}
+.war-panel.hidden{display:none}.war-panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.war-panel h3{margin:4px 0 0;font-size:18px}.war-status{padding:5px 9px;border-radius:999px;background:rgba(255,80,80,.14);font-size:10px;font-weight:800}.war-score-row{display:flex;justify-content:space-between;margin-top:12px;padding:9px 11px;background:rgba(255,255,255,.05);border-radius:10px}.war-bars{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.war-bars small,.war-stats small{display:block;opacity:.62;font-size:10px;margin-bottom:5px}.war-bar{height:7px;background:rgba(255,255,255,.09);border-radius:99px;overflow:hidden}.war-bar i{display:block;height:100%;width:100%;background:#fff;border-radius:99px;transition:width .3s}.war-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:10px}.war-stats>div{padding:8px;background:rgba(255,255,255,.05);border-radius:9px}.war-stats b{font-size:13px}.war-message{margin-top:10px;font-size:12px;line-height:1.45;opacity:.82}.war-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.war-actions button{flex:1;min-width:140px}.territory-at-war{filter:saturate(1.35);stroke:#ff6b6b!important;stroke-width:3!important}.territory-occupied{opacity:.55!important;stroke:#ffd166!important;stroke-width:4!important}
+@media(max-width:700px){.war-bars{grid-template-columns:1fr}.war-stats{grid-template-columns:1fr 1fr}}
+</style>
+
+
+
+<style id="development-cost-styles">
+.action-card strong{display:flex;flex-direction:column;align-items:flex-end;gap:3px}.action-cost{font-size:10px;font-weight:700;opacity:.7;white-space:nowrap}.action-card.insufficient{opacity:.55;filter:grayscale(.25)}
+</style>
+<script>
+/* === СТОИМОСТЬ РАЗВИТИЯ === */
+(() => {
+  const costs = { factory:100, tech:150, army:200, fleet:250 };
+  const names = { factory:'Заводы', tech:'Технологии', army:'Армия', fleet:'Флот' };
+  const money = () => document.getElementById('moneyValue');
+  const getMoney = () => parseInt((money()?.textContent || '0').replace(/\D/g,''),10) || 0;
+  const setMoney = value => { if(money()) money().textContent = Math.max(0, Math.floor(value)); };
+  const log = msg => { const l=document.getElementById('eventLog'); if(!l)return; const d=document.createElement('div'); d.className='event-item'; d.textContent=msg; l.prepend(d); while(l.children.length>8) l.lastElementChild.remove(); };
+
+  function updateButtons(){
+    document.querySelectorAll('[data-action]').forEach(btn => {
+      const cost=costs[btn.dataset.action];
+      btn.classList.toggle('insufficient', getMoney()<cost);
+    });
+  }
+
+  document.addEventListener('click', e => {
+    const btn=e.target.closest('[data-action]');
+    if(!btn) return;
+    const cost=costs[btn.dataset.action];
+    if(cost == null) return;
+    const current=getMoney();
+    if(current < cost){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      log(`💸 Недостаточно денег на развитие: нужно ${cost} ₽`);
+      return;
+    }
+    setTimeout(() => {
+      const now=getMoney();
+      setMoney(Math.max(0, now-cost));
+      log(`💰 ${names[btn.dataset.action]}: −${cost} ₽`);
+      updateButtons();
+    }, 0);
+  }, true);
+
+  setInterval(updateButtons, 1000);
+  updateButtons();
+})();
+</script>
+
+<style id="expansion-ui">
+.world-command-panel{margin:12px 0;padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(8,12,18,.88)}
+.world-command-tabs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}.world-command-tabs button{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#fff;border-radius:9px;padding:7px 10px;cursor:pointer}.world-command-tabs button.active{background:rgba(255,193,7,.18);border-color:rgba(255,193,7,.45)}
+.world-command-content{font-size:12px}.world-news-item{padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)}.world-news-item:last-child{border:0}.world-mini-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.world-mini-stat{padding:9px;border-radius:10px;background:rgba(255,255,255,.045)}.world-mini-stat small{display:block;opacity:.55;font-size:9px}.world-mini-stat b{display:block;margin-top:2px;font-size:13px}.build-row,.tech-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)}.build-row button{border:0;border-radius:8px;padding:6px 9px;background:#b58b2a;color:#fff;cursor:pointer}.build-row button:disabled{opacity:.4;cursor:not-allowed}.world-modebar{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.world-modebar button{border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.2);color:#ddd;border-radius:8px;padding:5px 8px;cursor:pointer}.world-ai-badge{display:inline-block;margin-top:7px;padding:5px 8px;border-radius:8px;background:rgba(76,175,80,.12);color:#b8e6ba}.world-event{padding:7px 8px;margin:5px 0;border-radius:8px;background:rgba(255,255,255,.04)}
+@media(max-width:700px){.world-mini-grid{grid-template-columns:1fr 1fr}}
+</style>
 </head>
 <body>
   <div id="app">
@@ -38,19 +145,23 @@
 
     <section id="tutorialScreen" class="screen hidden">
       <div class="tutorial-panel">
-        <div class="eyebrow">ОБУЧЕНИЕ</div>
-        <h2>Как играть</h2>
+        <div class="eyebrow">БЫСТРЫЙ СТАРТ</div>
+        <h2>Как управлять империей</h2>
         <div id="tutorialCountry" class="tutorial-country"></div>
-        <p class="tutorial-intro">Короткий туториал перед началом кампании.</p>
+        <p class="tutorial-intro">Коротко покажем основные кнопки. После этого можно начинать кампанию.</p>
+
         <div class="tutorial-steps">
-          <div class="tutorial-step"><span>1</span><div><b>Развивайте страну</b><small>Покупайте заводы, технологии, армию и флот за деньги.</small></div></div>
-          <div class="tutorial-step"><span>2</span><div><b>Следите за ресурсами</b><small>Верхняя панель показывает деньги, промышленность, технологии, армию и флот.</small></div></div>
-          <div class="tutorial-step"><span>3</span><div><b>Дипломатия</b><small>Заключайте альянсы или включайте военное положение.</small></div></div>
-          <div class="tutorial-step"><span>4</span><div><b>Мировая карта</b><small>Нажимайте на территории и изучайте страны. Ваша территория подсвечена отдельно.</small></div></div>
-          <div class="tutorial-step"><span>5</span><div><b>Военная подготовка</b><small>Открывайте тренировку и поражайте появляющиеся цели разным оружием.</small></div></div>
-          <div class="tutorial-step"><span>6</span><div><b>Покупки</b><small>В магазине можно приобрести оружие, корабли и лаборатории.</small></div></div>
+          <div class="tutorial-step"><span>1</span><div><b>💰 Смотри на ресурсы</b><small>Вверху находятся деньги ₽, промышленность ⚙, технологии ⚡, армия ⚔ и флот ⚓.</small></div></div>
+          <div class="tutorial-step"><span>2</span><div><b>⚙ Развивай страну</b><small>Слева: «Заводы» увеличивают промышленность, «Технологии» — технологии, «Армия» — военную силу, «Флот» — морскую силу.</small></div></div>
+          <div class="tutorial-step"><span>3</span><div><b>🗺️ Изучай карту</b><small>Нажимай на территории на мировой карте, чтобы изучать страны и следить за обстановкой.</small></div></div>
+          <div class="tutorial-step"><span>4</span><div><b>🤝 Используй дипломатию</b><small>«Предложить альянс» — мирное взаимодействие. «Начать войну» — военное положение.</small></div></div>
+          <div class="tutorial-step"><span>5</span><div><b>🛒 Пользуйся магазином</b><small>Оружейный набор нужен для тренировок, малый корабль даёт +1 к флоту, лаборатория — +5 технологий.</small></div></div>
+          <div class="tutorial-step"><span>6</span><div><b>🎯 Тренируй армию</b><small>Нажми «Открыть полигон», выбери оружие и поражай появляющиеся мишени.</small></div></div>
+          <div class="tutorial-step"><span>7</span><div><b>📋 Следи за событиями</b><small>Панель «События» показывает важные действия. Развивайся постепенно и не трать все деньги сразу.</small></div></div>
         </div>
-        <button id="finishTutorialBtn" class="primary-btn">Начать игру</button>
+
+        <div class="tutorial-tip"><b>💡 Совет:</b><span>Сначала развивай промышленность и технологии, затем усиливай армию и флот.</span></div>
+        <button id="finishTutorialBtn" class="primary-btn">Понятно, начать игру</button>
       </div>
     </section>
 
@@ -80,16 +191,16 @@
 
           <div class="panel-title">Развитие</div>
           <button class="action-card" data-action="factory">
-            <span class="action-icon">⚙</span><span><b>Заводы</b><small>+промышленность</small></span><strong>+5</strong>
+            <span class="action-icon">⚙</span><span><b>Заводы</b><small>+промышленность</small></span><strong>+5 <small class="action-cost">100 ₽</small></strong>
           </button>
           <button class="action-card" data-action="tech">
-            <span class="action-icon">⚡</span><span><b>Технологии</b><small>+технологии</small></span><strong>+4</strong>
+            <span class="action-icon">⚡</span><span><b>Технологии</b><small>+технологии</small></span><strong>+4 <small class="action-cost">150 ₽</small></strong>
           </button>
           <button class="action-card" data-action="army">
-            <span class="action-icon">⚔</span><span><b>Армия</b><small>+военная сила</small></span><strong>+2</strong>
+            <span class="action-icon">⚔</span><span><b>Армия</b><small>+военная сила</small></span><strong>+2 <small class="action-cost">200 ₽</small></strong>
           </button>
           <button class="action-card" data-action="fleet">
-            <span class="action-icon">⚓</span><span><b>Флот</b><small>+морская сила</small></span><strong>+1</strong>
+            <span class="action-icon">⚓</span><span><b>Флот</b><small>+морская сила</small></span><strong>+1 <small class="action-cost">250 ₽</small></strong>
           </button>
 
           <div class="panel-title">Дипломатия</div>
@@ -112,6 +223,40 @@
             </svg>
             <div class="map-legend"><span class="legend-own"></span> Ваша территория <span class="legend-other"></span> Другие страны</div>
           </div>
+          <div id="countryInfoPanel" class="country-info-panel hidden" aria-live="polite">
+            <div id="countryInfoTitle" class="country-info-title">Выберите страну</div>
+            <div id="countryInfoText" class="country-info-text">Нажмите на территорию на карте, чтобы увидеть информацию о ней.</div>
+            <div id="countryInfoGrid" class="country-info-grid"></div>
+          </div>
+          <div id="warPanel" class="war-panel hidden" aria-live="polite">
+            <div class="war-panel-head">
+              <div>
+                <div class="muted">ВОЕННЫЙ КОНФЛИКТ</div>
+                <h3 id="warTitle">Война</h3>
+              </div>
+              <span id="warStatus" class="war-status">МИР</span>
+            </div>
+            <div class="war-score-row">
+              <span>Военный счёт</span><b id="warScore">0 : 0</b>
+            </div>
+            <div class="war-bars">
+              <div><small>Ваша армия</small><div class="war-bar"><i id="playerWarBar"></i></div></div>
+              <div><small>Армия противника</small><div class="war-bar"><i id="enemyWarBar"></i></div></div>
+            </div>
+            <div class="war-stats">
+              <div><small>Сражений</small><b id="warBattles">0</b></div>
+              <div><small>Ваши потери</small><b id="playerLosses">0</b></div>
+              <div><small>Потери врага</small><b id="enemyLosses">0</b></div>
+              <div><small>Оккупировано</small><b id="warOccupied">0%</b></div>
+            </div>
+            <div id="warMessage" class="war-message">Выберите страну на карте.</div>
+            <div class="war-actions">
+              <button id="warAttackBtn" class="primary-btn small" disabled style="display:none">⚔ Атаковать</button>
+              <button id="warMobilizeBtn" class="wide-btn" disabled style="display:none">🪖 Мобилизовать</button>
+              <button id="warPeaceBtn" class="wide-btn" disabled>🤝 Остановить войну</button>
+            </div>
+          </div>
+
         </section>
 
         <aside class="right-panel">
@@ -172,5 +317,1056 @@
   <script src="js/training.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/main.js"></script>
+
+<script>
+/* === АУДИО И ЭФФЕКТЫ «ИМПЕРИЯ ХАОСА» === */
+(() => {
+  let audioCtx = null;
+  let master = null;
+  let musicGain = null;
+  let musicTimer = null;
+  let musicStarted = false;
+  let muted = false;
+
+  const AudioSystem = {
+    init() {
+      if (audioCtx) {
+        if (audioCtx.state === "suspended") audioCtx.resume();
+        return;
+      }
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+      master = audioCtx.createGain();
+      master.gain.value = 0.28;
+      master.connect(audioCtx.destination);
+
+      musicGain = audioCtx.createGain();
+      musicGain.gain.value = 0.075;
+      musicGain.connect(master);
+
+      this.startMusic();
+    },
+
+    tone(freq, duration, type="sine", volume=0.12, when=0, slideTo=null) {
+      if (!audioCtx || muted) return;
+      const now = audioCtx.currentTime + when;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, now);
+      if (slideTo) osc.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), now + duration);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(volume, now + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+      osc.connect(gain);
+      gain.connect(master);
+      osc.start(now);
+      osc.stop(now + duration + 0.03);
+    },
+
+    noise(duration=0.12, volume=0.06, filterFreq=1200) {
+      if (!audioCtx || muted) return;
+      const length = Math.floor(audioCtx.sampleRate * duration);
+      const buffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i=0; i<length; i++) {
+        data[i] = (Math.random() * 2 - 1) * (1 - i / length);
+      }
+
+      const source = audioCtx.createBufferSource();
+      const filter = audioCtx.createBiquadFilter();
+      const gain = audioCtx.createGain();
+
+      filter.type = "lowpass";
+      filter.frequency.value = filterFreq;
+      gain.gain.value = volume;
+
+      source.buffer = buffer;
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(master);
+      source.start();
+    },
+
+    click() {
+      this.tone(520, 0.055, "square", 0.045);
+      this.tone(760, 0.045, "square", 0.025, 0.025);
+    },
+
+    hover() {
+      this.tone(700, 0.025, "sine", 0.018);
+    },
+
+    success() {
+      this.tone(523, 0.10, "sine", 0.07);
+      this.tone(659, 0.12, "sine", 0.07, 0.07);
+      this.tone(784, 0.18, "sine", 0.07, 0.14);
+    },
+
+    purchase() {
+      this.tone(392, 0.08, "triangle", 0.07);
+      this.tone(523, 0.10, "triangle", 0.07, 0.08);
+      this.tone(659, 0.16, "triangle", 0.06, 0.16);
+    },
+
+    warning() {
+      this.tone(180, 0.12, "sawtooth", 0.055);
+      this.tone(150, 0.16, "sawtooth", 0.045, 0.12);
+    },
+
+    shot(weapon="pistol") {
+      if (weapon === "cannon") {
+        this.noise(0.25, 0.12, 900);
+        this.tone(75, 0.35, "sine", 0.12, 0, 38);
+      } else if (weapon === "rifle") {
+        this.noise(0.12, 0.085, 1700);
+        this.tone(120, 0.13, "square", 0.055, 0, 70);
+      } else {
+        this.noise(0.075, 0.065, 2300);
+        this.tone(170, 0.09, "square", 0.04, 0, 90);
+      }
+    },
+
+    hit() {
+      this.tone(880, 0.06, "square", 0.07);
+      this.tone(1320, 0.09, "square", 0.05, 0.05);
+    },
+
+    war() {
+      this.tone(110, 0.16, "sawtooth", 0.07);
+      this.tone(82, 0.22, "sawtooth", 0.06, 0.13);
+      this.noise(0.16, 0.045, 700);
+    },
+
+    alliance() {
+      this.tone(392, 0.12, "sine", 0.06);
+      this.tone(494, 0.12, "sine", 0.06, 0.10);
+      this.tone(659, 0.22, "sine", 0.06, 0.20);
+    },
+
+    startMusic() {
+      if (musicStarted || !audioCtx) return;
+      musicStarted = true;
+
+      // Спокойная синтезированная фоновая тема без внешних аудиофайлов.
+      const notes = [110, 130.81, 146.83, 164.81, 146.83, 130.81, 98, 110];
+      let index = 0;
+
+      const playNote = () => {
+        if (!audioCtx || muted) return;
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = "triangle";
+        osc.frequency.value = notes[index % notes.length];
+
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.linearRampToValueAtTime(0.12, now + 0.18);
+        gain.gain.linearRampToValueAtTime(0.0001, now + 1.45);
+
+        osc.connect(gain);
+        gain.connect(musicGain);
+        osc.start(now);
+        osc.stop(now + 1.5);
+
+        index++;
+        musicTimer = setTimeout(playNote, 1500);
+      };
+
+      playNote();
+    },
+
+    toggle() {
+      muted = !muted;
+      if (master) master.gain.value = muted ? 0 : 0.28;
+      if (!muted && audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+      return muted;
+    }
+  };
+
+  window.ImperiyaAudio = AudioSystem;
+
+  // Первый пользовательский жест запускает WebAudio.
+  const activate = () => {
+    AudioSystem.init();
+    window.removeEventListener("pointerdown", activate);
+    window.removeEventListener("keydown", activate);
+  };
+  window.addEventListener("pointerdown", activate, {once:true});
+  window.addEventListener("keydown", activate, {once:true});
+
+  document.addEventListener("click", (e) => {
+    const button = e.target.closest("button");
+    if (!button) return;
+
+    if (!audioCtx) AudioSystem.init();
+
+    if (button.matches("#allianceBtn")) {
+      AudioSystem.alliance();
+    } else if (button.matches("#warBtn")) {
+      AudioSystem.war();
+    } else if (button.matches("[data-buy]")) {
+      AudioSystem.purchase();
+    } else if (button.matches("[data-action]")) {
+      AudioSystem.success();
+    } else if (button.matches("#target")) {
+      AudioSystem.hit();
+    } else if (button.matches("#startTraining")) {
+      AudioSystem.success();
+    } else if (button.matches("#playBtn, #startGameBtn, #finishTutorialBtn")) {
+      AudioSystem.click();
+    } else {
+      AudioSystem.click();
+    }
+  }, true);
+
+  document.addEventListener("mouseover", (e) => {
+    const button = e.target.closest("button");
+    if (button && !button.dataset.audioHover) {
+      button.dataset.audioHover = "1";
+      if (audioCtx) AudioSystem.hover();
+    }
+  });
+
+  // Кнопка включения/выключения звука.
+  window.addEventListener("load", () => {
+    const btn = document.createElement("button");
+    btn.id = "audioToggle";
+    btn.type = "button";
+    btn.textContent = "🔊";
+    btn.title = "Звук";
+    btn.style.cssText = `
+      position:fixed;right:16px;bottom:16px;z-index:99999;
+      width:44px;height:44px;border:1px solid rgba(255,255,255,.18);
+      border-radius:12px;background:rgba(10,14,20,.88);color:#fff;
+      font-size:20px;cursor:pointer;backdrop-filter:blur(8px);
+      box-shadow:0 8px 25px rgba(0,0,0,.3);
+    `;
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!audioCtx) AudioSystem.init();
+      const isMuted = AudioSystem.toggle();
+      btn.textContent = isMuted ? "🔇" : "🔊";
+    });
+    document.body.appendChild(btn);
+  });
+
+  // Если существующий скрипт вызывает тренировочную стрельбу,
+  // перехватываем клики по мишени дополнительно.
+  document.addEventListener("click", (e) => {
+    if (e.target.id === "target") {
+      AudioSystem.shot(
+        document.querySelector(".weapon.active")?.dataset.weapon || "pistol"
+      );
+    }
+  }, true);
+})();
+</script>
+
+<script>
+/* === ДОХОД И СКРЫТИЕ НАЗВАНИЙ СТРАН === */
+(() => {
+  const INCOME_INTERVAL = 10000; // каждые 10 секунд
+  const BASE_INCOME = 50;         // базовый доход
+
+  function getNumber(id) {
+    const el = document.getElementById(id);
+    return el ? (parseInt(el.textContent.replace(/\D/g, ''), 10) || 0) : 0;
+  }
+
+  function setMoney(value) {
+    const el = document.getElementById('moneyValue');
+    if (el) el.textContent = Math.max(0, Math.floor(value));
+  }
+
+  function addLog(message) {
+    const log = document.getElementById('eventLog');
+    if (!log) return;
+    const item = document.createElement('div');
+    item.className = 'event-item';
+    item.textContent = message;
+    log.prepend(item);
+    while (log.children.length > 8) log.lastElementChild.remove();
+  }
+
+  function earnMoney() {
+    const game = document.getElementById('gameScreen');
+    if (!game || game.classList.contains('hidden')) return;
+
+    const industry = getNumber('industryValue');
+    const income = BASE_INCOME + Math.floor(industry * 2);
+    const current = getNumber('moneyValue');
+
+    setMoney(current + income);
+    addLog(`💰 Доход империи: +${income} ₽`);
+
+    const candidates = [window.gameState, window.GameState, window.state, window.State];
+    for (const obj of candidates) {
+      if (obj && typeof obj === 'object' && Object.prototype.hasOwnProperty.call(obj, 'money')) {
+        obj.money = current + income;
+        break;
+      }
+    }
+  }
+
+  setInterval(earnMoney, INCOME_INTERVAL);
+})();
+</script>
+
+
+<script>
+/* === УДАЛЕНИЕ ФЛАГОВ С КАРТЫ === */
+(() => {
+  const selectors = [
+    '#worldMap .country-flag',
+    '#worldMap .territory-flag',
+    '#worldMap .flag',
+    '#worldMap .map-flag',
+    '#worldMap image',
+    '#worldMap .flag-label',
+    '#worldMap .country-icon'
+  ];
+
+  function hideMapFlags() {
+    document.querySelectorAll(selectors.join(',')).forEach(el => el.remove());
+  }
+
+  hideMapFlags();
+  new MutationObserver(hideMapFlags).observe(document.getElementById('worldMap') || document.body, {
+    childList: true,
+    subtree: true
+  });
+})();
+</script>
+
+
+<script>
+/* === УДАЛЕНИЕ ЧЁРНЫХ ПРЯМОУГОЛЬНИКОВ С КАРТЫ === */
+(() => {
+  function removeBlackMapBoxes() {
+    const map = document.getElementById('worldMap');
+    if (!map) return;
+    map.querySelectorAll('#territories rect').forEach(el => {
+      const fill = (el.getAttribute('fill') || '').toLowerCase().replace(/\s/g, '');
+      const style = (el.getAttribute('style') || '').toLowerCase().replace(/\s/g, '');
+      if (fill === '#000' || fill === '#000000' || fill === 'black' || fill === 'rgb(0,0,0)' || style.includes('fill:#000') || style.includes('fill:black')) el.remove();
+    });
+  }
+  removeBlackMapBoxes();
+  const observer = new MutationObserver(removeBlackMapBoxes);
+  observer.observe(document.getElementById('worldMap') || document.body, {childList:true, subtree:true});
+})();
+</script>
+
+<script>
+/* === ИНФОРМАЦИЯ О СТРАНЕ ПРИ КЛИКЕ === */
+(() => {
+  function clean(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function findValue(el, names) {
+    let node = el;
+    for (const name of names) {
+      if (el.dataset && el.dataset[name] != null) return el.dataset[name];
+      if (el.getAttribute && el.getAttribute('data-' + name) != null) return el.getAttribute('data-' + name);
+      if (el.getAttribute && el.getAttribute(name) != null) return el.getAttribute(name);
+    }
+    while (node && node !== document) {
+      for (const name of names) {
+        if (node.dataset && node.dataset[name] != null) return node.dataset[name];
+        if (node.getAttribute && node.getAttribute('data-' + name) != null) return node.getAttribute('data-' + name);
+      }
+      node = node.parentElement;
+    }
+    return '';
+  }
+
+  const fullRussianCountryNames = {
+    "AFG":"Исламский Эмират Афганистан",
+    "ALB":"Республика Албания",
+    "DZA":"Алжирская Народная Демократическая Республика",
+    "AND":"Княжество Андорра",
+    "AGO":"Республика Ангола",
+    "ATG":"Антигуа и Барбуда",
+    "ARG":"Аргентинская Республика",
+    "ARM":"Республика Армения",
+    "AUS":"Австралийский Союз",
+    "AUT":"Австрийская Республика",
+    "AZE":"Азербайджанская Республика",
+    "BHS":"Содружество Багамских Островов",
+    "BHR":"Королевство Бахрейн",
+    "BGD":"Народная Республика Бангладеш",
+    "BRB":"Барбадос",
+    "BLR":"Республика Беларусь",
+    "BEL":"Королевство Бельгия",
+    "BLZ":"Белиз",
+    "BEN":"Республика Бенин",
+    "BTN":"Королевство Бутан",
+    "BOL":"Многонациональное Государство Боливия",
+    "BIH":"Босния и Герцеговина",
+    "BWA":"Республика Ботсвана",
+    "BRA":"Федеративная Республика Бразилия",
+    "BRN":"Бруней-Даруссалам",
+    "BGR":"Республика Болгария",
+    "BFA":"Буркина-Фасо",
+    "BDI":"Республика Бурунди",
+    "CPV":"Республика Кабо-Верде",
+    "KHM":"Королевство Камбоджа",
+    "CMR":"Республика Камерун",
+    "CAN":"Канада",
+    "CAF":"Центральноафриканская Республика",
+    "TCD":"Республика Чад",
+    "CHL":"Республика Чили",
+    "CHN":"Китайская Народная Республика",
+    "COL":"Республика Колумбия",
+    "COM":"Союз Коморских Островов",
+    "COG":"Республика Конго",
+    "COD":"Демократическая Республика Конго",
+    "CRI":"Республика Коста-Рика",
+    "CIV":"Республика Кот-д’Ивуар",
+    "HRV":"Республика Хорватия",
+    "CUB":"Республика Куба",
+    "CYP":"Республика Кипр",
+    "CZE":"Чешская Республика",
+    "DNK":"Королевство Дания",
+    "DJI":"Джибутийская Республика",
+    "DMA":"Содружество Доминики",
+    "DOM":"Доминиканская Республика",
+    "ECU":"Республика Эквадор",
+    "EGY":"Арабская Республика Египет",
+    "SLV":"Республика Эль-Сальвадор",
+    "GNQ":"Республика Экваториальная Гвинея",
+    "ERI":"Государство Эритрея",
+    "EST":"Эстонская Республика",
+    "SWZ":"Королевство Эсватини",
+    "ETH":"Федеративная Демократическая Республика Эфиопия",
+    "FJI":"Республика Фиджи",
+    "FIN":"Финляндская Республика",
+    "FRA":"Французская Республика",
+    "GAB":"Габонская Республика",
+    "GMB":"Республика Гамбия",
+    "GEO":"Грузия",
+    "DEU":"Федеративная Республика Германия",
+    "GHA":"Республика Гана",
+    "GRC":"Греческая Республика",
+    "GRD":"Гренада",
+    "GTM":"Республика Гватемала",
+    "GIN":"Гвинейская Республика",
+    "GNB":"Гвинейская Республика-Бисау",
+    "GUY":"Кооперативная Республика Гайана",
+    "HTI":"Республика Гаити",
+    "HND":"Республика Гондурас",
+    "HUN":"Венгрия",
+    "ISL":"Республика Исландия",
+    "IND":"Республика Индия",
+    "IDN":"Республика Индонезия",
+    "IRN":"Исламская Республика Иран",
+    "IRQ":"Республика Ирак",
+    "IRL":"Ирландия",
+    "ISR":"Государство Израиль",
+    "ITA":"Итальянская Республика",
+    "JAM":"Ямайка",
+    "JPN":"Япония",
+    "JOR":"Иорданское Хашимитское Королевство",
+    "KAZ":"Республика Казахстан",
+    "KEN":"Республика Кения",
+    "KIR":"Республика Кирибати",
+    "PRK":"Корейская Народно-Демократическая Республика",
+    "KOR":"Республика Корея",
+    "KWT":"Государство Кувейт",
+    "KGZ":"Кыргызская Республика",
+    "LAO":"Лаосская Народно-Демократическая Республика",
+    "LVA":"Латвийская Республика",
+    "LBN":"Ливанская Республика",
+    "LSO":"Королевство Лесото",
+    "LBR":"Республика Либерия",
+    "LBY":"Государство Ливия",
+    "LIE":"Княжество Лихтенштейн",
+    "LTU":"Литовская Республика",
+    "LUX":"Великое Герцогство Люксембург",
+    "MDG":"Республика Мадагаскар",
+    "MWI":"Республика Малави",
+    "MYS":"Малайзия",
+    "MDV":"Мальдивская Республика",
+    "MLI":"Республика Мали",
+    "MLT":"Республика Мальта",
+    "MHL":"Республика Маршалловы Острова",
+    "MRT":"Исламская Республика Мавритания",
+    "MUS":"Республика Маврикий",
+    "MEX":"Мексиканские Соединённые Штаты",
+    "FSM":"Федеративные Штаты Микронезии",
+    "MDA":"Республика Молдова",
+    "MCO":"Княжество Монако",
+    "MNG":"Монголия",
+    "MNE":"Черногория",
+    "MAR":"Королевство Марокко",
+    "MOZ":"Республика Мозамбик",
+    "MMR":"Республика Союз Мьянма",
+    "NAM":"Республика Намибия",
+    "NRU":"Республика Науру",
+    "NPL":"Федеративная Демократическая Республика Непал",
+    "NLD":"Королевство Нидерландов",
+    "NZL":"Новая Зеландия",
+    "NIC":"Республика Никарагуа",
+    "NER":"Республика Нигер",
+    "NGA":"Федеративная Республика Нигерия",
+    "MKD":"Республика Северная Македония",
+    "NOR":"Королевство Норвегия",
+    "OMN":"Султанат Оман",
+    "PAK":"Исламская Республика Пакистан",
+    "PLW":"Республика Палау",
+    "PAN":"Республика Панама",
+    "PNG":"Независимое Государство Папуа — Новая Гвинея",
+    "PRY":"Республика Парагвай",
+    "PER":"Республика Перу",
+    "PHL":"Республика Филиппины",
+    "POL":"Республика Польша",
+    "PRT":"Португальская Республика",
+    "QAT":"Государство Катар",
+    "ROU":"Румыния",
+    "RUS":"Российская Федерация",
+    "RWA":"Республика Руанда",
+    "KNA":"Федерация Сент-Китс и Невис",
+    "LCA":"Сент-Люсия",
+    "VCT":"Сент-Винсент и Гренадины",
+    "WSM":"Независимое Государство Самоа",
+    "SMR":"Республика Сан-Марино",
+    "STP":"Демократическая Республика Сан-Томе и Принсипи",
+    "SAU":"Королевство Саудовская Аравия",
+    "SEN":"Республика Сенегал",
+    "SRB":"Республика Сербия",
+    "SYC":"Республика Сейшельские Острова",
+    "SLE":"Республика Сьерра-Леоне",
+    "SGP":"Республика Сингапур",
+    "SVK":"Словацкая Республика",
+    "SVN":"Республика Словения",
+    "SLB":"Соломоновы Острова",
+    "SOM":"Федеративная Республика Сомали",
+    "ZAF":"Южно-Африканская Республика",
+    "SSD":"Республика Южный Судан",
+    "ESP":"Королевство Испания",
+    "LKA":"Демократическая Социалистическая Республика Шри-Ланка",
+    "SDN":"Республика Судан",
+    "SUR":"Республика Суринам",
+    "SWE":"Королевство Швеция",
+    "CHE":"Швейцарская Конфедерация",
+    "SYR":"Сирийская Арабская Республика",
+    "TJK":"Республика Таджикистан",
+    "TZA":"Объединённая Республика Танзания",
+    "THA":"Королевство Таиланд",
+    "TLS":"Демократическая Республика Тимор-Лешти",
+    "TGO":"Тоголезская Республика",
+    "TON":"Королевство Тонга",
+    "TTO":"Республика Тринидад и Тобаго",
+    "TUN":"Тунисская Республика",
+    "TUR":"Турецкая Республика",
+    "TKM":"Туркменистан",
+    "TUV":"Тувалу",
+    "UGA":"Республика Уганда",
+    "UKR":"Украина",
+    "ARE":"Объединённые Арабские Эмираты",
+    "GBR":"Соединённое Королевство Великобритании и Северной Ирландии",
+    "USA":"Соединённые Штаты Америки",
+    "URY":"Восточная Республика Уругвай",
+    "UZB":"Республика Узбекистан",
+    "VUT":"Республика Вануату",
+    "VAT":"Государство-город Ватикан",
+    "VEN":"Боливарианская Республика Венесуэла",
+    "VNM":"Социалистическая Республика Вьетнам",
+    "YEM":"Йеменская Республика",
+    "ZMB":"Республика Замбия",
+    "ZWE":"Республика Зимбабве",
+    "AF":"Исламский Эмират Афганистан",
+    "AL":"Республика Албания",
+    "DZ":"Алжирская Народная Демократическая Республика",
+    "AD":"Княжество Андорра",
+    "AO":"Республика Ангола",
+    "AG":"Антигуа и Барбуда",
+    "AR":"Аргентинская Республика",
+    "AM":"Республика Армения",
+    "AU":"Австралийский Союз",
+    "AT":"Австрийская Республика",
+    "AZ":"Азербайджанская Республика",
+    "BS":"Содружество Багамских Островов",
+    "BH":"Королевство Бахрейн",
+    "BD":"Народная Республика Бангладеш",
+    "BB":"Барбадос",
+    "BY":"Республика Беларусь",
+    "BE":"Королевство Бельгия",
+    "BZ":"Белиз",
+    "BJ":"Республика Бенин",
+    "BT":"Королевство Бутан",
+    "BO":"Многонациональное Государство Боливия",
+    "BA":"Босния и Герцеговина",
+    "BW":"Республика Ботсвана",
+    "BR":"Федеративная Республика Бразилия",
+    "BN":"Бруней-Даруссалам",
+    "BG":"Республика Болгария",
+    "BF":"Буркина-Фасо",
+    "BI":"Республика Бурунди",
+    "CV":"Республика Кабо-Верде",
+    "KH":"Королевство Камбоджа",
+    "CM":"Республика Камерун",
+    "CA":"Канада",
+    "CF":"Центральноафриканская Республика",
+    "TD":"Республика Чад",
+    "CL":"Республика Чили",
+    "CN":"Китайская Народная Республика",
+    "CO":"Республика Колумбия",
+    "KM":"Союз Коморских Островов",
+    "CG":"Республика Конго",
+    "CD":"Демократическая Республика Конго",
+    "CR":"Республика Коста-Рика",
+    "CI":"Республика Кот-д’Ивуар",
+    "HR":"Республика Хорватия",
+    "CU":"Республика Куба",
+    "CY":"Республика Кипр",
+    "CZ":"Чешская Республика",
+    "DK":"Королевство Дания",
+    "DJ":"Джибутийская Республика",
+    "DM":"Содружество Доминики",
+    "DO":"Доминиканская Республика",
+    "EC":"Республика Эквадор",
+    "EG":"Арабская Республика Египет",
+    "SV":"Республика Эль-Сальвадор",
+    "GQ":"Республика Экваториальная Гвинея",
+    "ER":"Государство Эритрея",
+    "EE":"Эстонская Республика",
+    "SZ":"Королевство Эсватини",
+    "ET":"Федеративная Демократическая Республика Эфиопия",
+    "FJ":"Республика Фиджи",
+    "FI":"Финляндская Республика",
+    "FR":"Французская Республика",
+    "GA":"Габонская Республика",
+    "GM":"Республика Гамбия",
+    "GE":"Грузия",
+    "DE":"Федеративная Республика Германия",
+    "GH":"Республика Гана",
+    "GR":"Греческая Республика",
+    "GD":"Гренада",
+    "GT":"Республика Гватемала",
+    "GN":"Гвинейская Республика",
+    "GW":"Гвинейская Республика-Бисау",
+    "GY":"Кооперативная Республика Гайана",
+    "HT":"Республика Гаити",
+    "HN":"Республика Гондурас",
+    "HU":"Венгрия",
+    "IS":"Республика Исландия",
+    "IN":"Республика Индия",
+    "ID":"Республика Индонезия",
+    "IR":"Исламская Республика Иран",
+    "IQ":"Республика Ирак",
+    "IE":"Ирландия",
+    "IL":"Государство Израиль",
+    "IT":"Итальянская Республика",
+    "JM":"Ямайка",
+    "JP":"Япония",
+    "JO":"Иорданское Хашимитское Королевство",
+    "KZ":"Республика Казахстан",
+    "KE":"Республика Кения",
+    "KI":"Республика Кирибати",
+    "KP":"Корейская Народно-Демократическая Республика",
+    "KR":"Республика Корея",
+    "KW":"Государство Кувейт",
+    "KG":"Кыргызская Республика",
+    "LA":"Лаосская Народно-Демократическая Республика",
+    "LV":"Латвийская Республика",
+    "LB":"Ливанская Республика",
+    "LS":"Королевство Лесото",
+    "LR":"Республика Либерия",
+    "LY":"Государство Ливия",
+    "LI":"Княжество Лихтенштейн",
+    "LT":"Литовская Республика",
+    "LU":"Великое Герцогство Люксембург",
+    "MG":"Республика Мадагаскар",
+    "MW":"Республика Малави",
+    "MY":"Малайзия",
+    "MV":"Мальдивская Республика",
+    "ML":"Республика Мали",
+    "MT":"Республика Мальта",
+    "MH":"Республика Маршалловы Острова",
+    "MR":"Исламская Республика Мавритания",
+    "MU":"Республика Маврикий",
+    "MX":"Мексиканские Соединённые Штаты",
+    "FM":"Федеративные Штаты Микронезии",
+    "MD":"Республика Молдова",
+    "MC":"Княжество Монако",
+    "MN":"Монголия",
+    "ME":"Черногория",
+    "MA":"Королевство Марокко",
+    "MZ":"Республика Мозамбик",
+    "MM":"Республика Союз Мьянма",
+    "NA":"Республика Намибия",
+    "NR":"Республика Науру",
+    "NP":"Федеративная Демократическая Республика Непал",
+    "NL":"Королевство Нидерландов",
+    "NZ":"Новая Зеландия",
+    "NI":"Республика Никарагуа",
+    "NE":"Республика Нигер",
+    "NG":"Федеративная Республика Нигерия",
+    "MK":"Республика Северная Македония",
+    "NO":"Королевство Норвегия",
+    "OM":"Султанат Оман",
+    "PK":"Исламская Республика Пакистан",
+    "PW":"Республика Палау",
+    "PA":"Республика Панама",
+    "PG":"Независимое Государство Папуа — Новая Гвинея",
+    "PY":"Республика Парагвай",
+    "PE":"Республика Перу",
+    "PH":"Республика Филиппины",
+    "PL":"Республика Польша",
+    "PT":"Португальская Республика",
+    "QA":"Государство Катар",
+    "RO":"Румыния",
+    "RU":"Российская Федерация",
+    "RW":"Республика Руанда",
+    "KN":"Федерация Сент-Китс и Невис",
+    "LC":"Сент-Люсия",
+    "VC":"Сент-Винсент и Гренадины",
+    "WS":"Независимое Государство Самоа",
+    "SM":"Республика Сан-Марино",
+    "ST":"Демократическая Республика Сан-Томе и Принсипи",
+    "SA":"Королевство Саудовская Аравия",
+    "SN":"Республика Сенегал",
+    "RS":"Республика Сербия",
+    "SC":"Республика Сейшельские Острова",
+    "SL":"Республика Сьерра-Леоне",
+    "SG":"Республика Сингапур",
+    "SK":"Словацкая Республика",
+    "SI":"Республика Словения",
+    "SB":"Соломоновы Острова",
+    "SO":"Федеративная Республика Сомали",
+    "ZA":"Южно-Африканская Республика",
+    "SS":"Республика Южный Судан",
+    "ES":"Королевство Испания",
+    "LK":"Демократическая Социалистическая Республика Шри-Ланка",
+    "SD":"Республика Судан",
+    "SR":"Республика Суринам",
+    "SE":"Королевство Швеция",
+    "CH":"Швейцарская Конфедерация",
+    "SY":"Сирийская Арабская Республика",
+    "TJ":"Республика Таджикистан",
+    "TZ":"Объединённая Республика Танзания",
+    "TH":"Королевство Таиланд",
+    "TL":"Демократическая Республика Тимор-Лешти",
+    "TG":"Тоголезская Республика",
+    "TO":"Королевство Тонга",
+    "TT":"Республика Тринидад и Тобаго",
+    "TN":"Тунисская Республика",
+    "TR":"Турецкая Республика",
+    "TM":"Туркменистан",
+    "TV":"Тувалу",
+    "UG":"Республика Уганда",
+    "UA":"Украина",
+    "AE":"Объединённые Арабские Эмираты",
+    "GB":"Соединённое Королевство Великобритании и Северной Ирландии",
+    "US":"Соединённые Штаты Америки",
+    "UY":"Восточная Республика Уругвай",
+    "UZ":"Республика Узбекистан",
+    "VU":"Республика Вануату",
+    "VA":"Государство-город Ватикан",
+    "VE":"Боливарианская Республика Венесуэла",
+    "VN":"Социалистическая Республика Вьетнам",
+    "YE":"Йеменская Республика",
+    "ZM":"Республика Замбия",
+    "ZW":"Республика Зимбабве"
+  };
+
+  function getFullRussianCountryName(value) {
+    const raw = clean(value);
+    if (!raw) return '';
+    return fullRussianCountryNames[raw.toUpperCase()] || raw;
+  }
+
+  function showCountryInfo(target) {
+    const panel = document.getElementById('countryInfoPanel');
+    const title = document.getElementById('countryInfoTitle');
+    const text = document.getElementById('countryInfoText');
+    const grid = document.getElementById('countryInfoGrid');
+    if (!panel || !title || !text || !grid) return;
+
+    const countryRaw = clean(findValue(target, ['country','name','countryName','nation','territory','id'])) || clean(target.getAttribute('aria-label')) || clean(target.getAttribute('title'));
+    const country = getFullRussianCountryName(countryRaw);
+    const capital = clean(findValue(target, ['capital']));
+    const population = clean(findValue(target, ['population','pop']));
+    const area = clean(findValue(target, ['area','size']));
+    const description = clean(findValue(target, ['description','desc','info']));
+
+    title.textContent = country || 'Выбранная территория';
+    text.textContent = description || 'Информация о территории загружена из данных карты.';
+    grid.innerHTML = '';
+
+    const stats = [
+      ['Столица', capital],
+      ['Население', population],
+      ['Площадь', area]
+    ].filter(item => item[1]);
+
+    stats.forEach(([label, value]) => {
+      const card = document.createElement('div');
+      card.className = 'country-info-stat';
+      card.innerHTML = '<small>' + label + '</small><b>' + value.replace(/[<>]/g, '') + '</b>';
+      grid.appendChild(card);
+    });
+
+    if (!stats.length && !description) {
+      text.textContent = 'Для этой территории в доступных данных карты пока нет дополнительных сведений.';
+    }
+    panel.classList.remove('hidden');
+  }
+
+  document.addEventListener('click', (event) => {
+    const map = document.getElementById('worldMap');
+    if (!map || !map.contains(event.target)) return;
+    const target = event.target.closest('#territories > *, #territories *');
+    if (!target || target.closest('.country-info-panel')) return;
+    showCountryInfo(target);
+  });
+})();
+</script>
+
+
+<script>
+/* === РЕАЛИСТИЧНАЯ СИСТЕМА ВОЙН === */
+(() => {
+  const W = {active:false, targetEl:null, targetName:'', score:0, battles:0, playerLosses:0, enemyLosses:0, occupied:0, playerPower:100, enemyPower:100, mobilized:false};
+  let battleTimer = null;
+  const $ = id => document.getElementById(id);
+  const num = id => parseInt(($(`${id}`)?.textContent || '0').replace(/\\D/g,''),10) || 0;
+  function log(msg){ const l=$('eventLog'); if(!l)return; const d=document.createElement('div'); d.className='event-item'; d.textContent=msg; l.prepend(d); while(l.children.length>8)l.lastElementChild.remove(); }
+  function currentTarget(){ return $('countryInfoTitle')?.textContent?.trim() || 'неизвестная страна'; }
+  function playerPower(){ return Math.max(20, num('armyValue') + Math.floor(num('techValue')*.8) + Math.floor(num('industryValue')*.25)); }
+  function enemyPower(){ let seed=0; for(const c of currentTarget()) seed=(seed*31+c.charCodeAt(0))%997; return 45+(seed%95); }
+  function render(){
+    $('warPanel')?.classList.toggle('hidden', !W.active && !W.targetEl);
+    $('warTitle').textContent=W.active?`Война с ${W.targetName}`:`Конфликт с ${W.targetName || currentTarget()}`;
+    $('warStatus').textContent=W.active?'ВОЙНА':'ГОТОВ';
+    $('warScore').textContent=`${Math.max(-100,Math.min(100,Math.round(W.score)))} : ${Math.max(0,Math.round(-W.score))}`;
+    $('warBattles').textContent=W.battles; $('playerLosses').textContent=W.playerLosses; $('enemyLosses').textContent=W.enemyLosses; $('warOccupied').textContent=Math.round(W.occupied)+'%';
+    $('playerWarBar').style.width=Math.max(0,W.playerPower)+'%'; $('enemyWarBar').style.width=Math.max(0,W.enemyPower)+'%';
+    $('warAttackBtn').disabled=true; $('warMobilizeBtn').disabled=true; $('warPeaceBtn').disabled=!W.active;
+    const wb=$('warBtn'); if(wb) wb.textContent=W.active?'⚔ Война идёт':'⚔ Начать войну';
+  }
+  function selectTarget(el){
+    if(!el || !el.closest) return;
+    W.targetEl=el.closest('#territories > *, #territories *') || el;
+    setTimeout(()=>{ W.targetName=currentTarget(); render(); },0);
+  }
+  function startWar(){
+    if(!W.targetEl){ alert('Сначала выберите страну на карте.'); return; }
+    W.active=true; W.score=0; W.battles=0; W.playerLosses=0; W.enemyLosses=0; W.occupied=0; W.playerPower=playerPower(); W.enemyPower=enemyPower(); W.mobilized=true; W.targetName=currentTarget();
+    W.targetEl.classList.add('territory-at-war');
+    log(`⚔ Вы объявили войну: ${W.targetName}. Армия автоматически мобилизована.`);
+    render();
+    clearInterval(battleTimer);
+    battleTimer=setInterval(battle, 3500);
+  }
+  function battle(){
+    if(!W.active)return;
+    const p=playerPower()*(W.mobilized?1.25:1); const e=W.enemyPower;
+    const pRoll=p*(.75+Math.random()*.5), eRoll=e*(.75+Math.random()*.5);
+    const pLoss=Math.max(1,Math.round(eRoll/(p+e)*7)); const eLoss=Math.max(1,Math.round(pRoll/(p+e)*9));
+    W.playerLosses+=pLoss; W.enemyLosses+=eLoss; W.battles++; W.score += (eRoll < pRoll ? 7 : -6);
+    W.playerPower=Math.max(0,W.playerPower-pLoss*.8); W.enemyPower=Math.max(0,W.enemyPower-eLoss*.8);
+    if(pRoll>eRoll){ W.occupied=Math.min(100,W.occupied+Math.ceil(4+Math.random()*8)); W.targetEl?.classList.add('territory-occupied'); log(`⚔ Победа в сражении. Потери: ваши ${pLoss}, противника ${eLoss}. Захвачено ${Math.round(W.occupied)}%.`); }
+    else { W.occupied=Math.max(0,W.occupied-Math.ceil(Math.random()*3)); log(`🩸 Тяжёлое сражение. Потери: ваши ${pLoss}, противника ${eLoss}.`); }
+    if(W.occupied>=100 || W.enemyPower<=8 || W.score>=80){ finishWar(true); return; }
+    if(W.playerPower<=8 || W.score<=-80){ finishWar(false); return; }
+    render();
+  }
+  function mobilize(){ if(!W.active)return; W.mobilized=true; W.playerPower=Math.min(100,W.playerPower+20); log(`🪖 Проведена мобилизация. Военная мощь увеличена.`); render(); }
+  function finishWar(victory){
+    if(!W.active)return; W.active=false; clearInterval(battleTimer); battleTimer=null;
+    if(victory){ W.occupied=100; W.targetEl?.classList.remove('territory-at-war'); W.targetEl?.classList.add('territory-occupied'); $('warMessage').textContent=`Победа! ${W.targetName} разгромлена, территория занята.`; log(`🏆 Победа в войне с ${W.targetName}. Военный счёт ${Math.round(W.score)}.`); }
+    else { W.targetEl?.classList.remove('territory-at-war','territory-occupied'); $('warMessage').textContent=`Война завершена без победы. Армия понесла тяжёлые потери.`; log(`🕊 Война с ${W.targetName} завершена. Требуется восстановление армии.`); }
+    render();
+  }
+  function peace(){ if(!W.active)return; W.active=false; clearInterval(battleTimer); battleTimer=null; W.targetEl?.classList.remove('territory-at-war'); $('warMessage').textContent='Заключено перемирие. Фронт остановлен.'; log(`🤝 Перемирие с ${W.targetName}. Фронт остановлен.`); render(); }
+
+  document.addEventListener('click', e=>{
+    const map=$('worldMap');
+    if(map && map.contains(e.target)){ const t=e.target.closest('#territories > *, #territories *'); if(t) selectTarget(t); }
+  }, true);
+  document.addEventListener('click', e=>{
+    if(e.target.closest('#warBtn')){ e.preventDefault(); e.stopImmediatePropagation(); startWar(); return; }
+    if(e.target.closest('#warAttackBtn')){ battle(); return; }
+    if(e.target.closest('#warMobilizeBtn')){ mobilize(); return; }
+    if(e.target.closest('#warPeaceBtn')){ peace(); return; }
+  }, true);
+
+  const oldTargetClass = 'territory-at-war';
+  render();
+})();
+</script>
+
+<style id="world-ai-styles">
+.ai-at-war{stroke:#ff9f43!important;stroke-width:2.5!important;filter:saturate(1.15)}
+.ai-occupied{stroke:#f6d365!important;stroke-width:3!important;opacity:.72!important}
+#worldAiStatus{margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.045);font-size:12px;line-height:1.45;opacity:.85}
+</style>
+<script>
+/* === ИИ ВСЕГО МИРА ===
+   Игрок управляет одной выбранной страной, остальные государства действуют автоматически.
+*/
+(() => {
+  const AI = { countries: [], wars: [], player: null, timer: null, started:false };
+  const $ = id => document.getElementById(id);
+  const clean = v => String(v || '').replace(/\s+/g,' ').trim();
+  const getName = el => {
+    if (!el) return 'Неизвестная страна';
+    const raw = clean(el.dataset?.country || el.dataset?.name || el.dataset?.countryName || el.getAttribute('aria-label') || el.getAttribute('title') || el.id);
+    if (typeof window.getFullRussianCountryName === 'function') return window.getFullRussianCountryName(raw) || raw || 'Неизвестная страна';
+    return raw || 'Неизвестная страна';
+  };
+  const territoryList = () => [...document.querySelectorAll('#territories > *')].filter(el => el.nodeType === 1);
+  const power = el => {
+    let seed=0; for(const c of getName(el)) seed=(seed*33+c.charCodeAt(0))%10007;
+    return 55 + seed%145;
+  };
+  function detectPlayer(){
+    const explicit = document.querySelector('#territories [data-player="true"], #territories .player-country, #territories .selected-country, #territories [data-controlled="player"]');
+    if(explicit) return explicit.closest('#territories > *') || explicit;
+    // Если основной движок уже хранит выбранную страну — пробуем найти её по коду/имени.
+    const candidates = [window.selectedCountry, window.playerCountry, window.gameState?.selectedCountry, window.GameState?.selectedCountry, window.state?.selectedCountry];
+    const wanted = candidates.map(v=>clean(typeof v==='object' ? (v.code||v.id||v.name||v.country) : v)).find(Boolean);
+    if(wanted){
+      const norm=wanted.toUpperCase();
+      return territoryList().find(el => [el.id,el.dataset?.country,el.dataset?.name,el.dataset?.countryCode,el.getAttribute('aria-label'),el.getAttribute('title')].some(v=>clean(v).toUpperCase()===norm)) || null;
+    }
+    return null;
+  }
+  function setup(){
+    AI.countries=territoryList();
+    if(!AI.countries.length || AI.started) return;
+    AI.player=detectPlayer();
+    if(!AI.player){
+      const status=document.createElement('div');
+      status.id='worldAiStatus';
+      status.textContent='🌍 ИИ управляет остальным миром. Нажмите на свою страну на карте, чтобы назначить её игроку.';
+      const panel=$('countryInfoPanel');
+      panel?.parentNode?.insertBefore(status,panel.nextSibling);
+    }
+    AI.started=true;
+    AI.timer=setInterval(tick,4200);
+    window.WorldAI=AI;
+  }
+  function ensurePlayerFromSelection(){
+    if(AI.player) return;
+    const info=$('countryInfoTitle')?.textContent;
+    if(!info || info==='Выберите страну') return;
+    const found=AI.countries.find(el=>getName(el)===info);
+    if(found){
+      AI.player=found;
+      const status=$('worldAiStatus'); if(status) status.textContent=`👑 Вы управляете: ${getName(found)}. Остальные ${Math.max(0,AI.countries.length-1)} государств контролирует ИИ.`;
+      found.classList.add('player-country');
+    }
+  }
+  function freeAI(){ return AI.countries.filter(c=>c!==AI.player && !c.dataset.aiDefeated); }
+  function hasWar(el){ return AI.wars.some(w=>w.a===el||w.b===el); }
+  function startAIWar(a,b){
+    if(!a||!b||a===b||hasWar(a)||hasWar(b)) return;
+    const w={a,b,score:0,progress:0,aPower:power(a),bPower:power(b),battles:0};
+    AI.wars.push(w); a.classList.add('ai-at-war'); b.classList.add('ai-at-war');
+    if(Math.random()<.35) logAI(`🌍 ${getName(a)} объявила войну ${getName(b)}.`);
+  }
+  function logAI(msg){
+    const l=$('eventLog'); if(!l)return;
+    const d=document.createElement('div'); d.className='event-item'; d.textContent=msg; l.prepend(d);
+    while(l.children.length>8) l.lastElementChild.remove();
+  }
+  function finishAIWar(w, winner){
+    const loser=winner===w.a?w.b:w.a;
+    winner.classList.remove('ai-at-war'); winner.classList.add('ai-occupied');
+    loser.classList.remove('ai-at-war');
+    if(Math.random()<.5) winner.dataset.aiStrength=String(Math.max(50,Number(winner.dataset.aiStrength||power(winner))+12));
+    if(loser===AI.player) return;
+    if(winner!==AI.player && loser!==AI.player && Math.random()<.3) logAI(`🏳️ ${getName(loser)} потерпела поражение в войне с ${getName(winner)}.`);
+    w.done=true;
+  }
+  function progressWar(w){
+    const ar=w.aPower*(.8+Math.random()*.4), br=w.bPower*(.8+Math.random()*.4);
+    w.battles++;
+    const diff=ar-br;
+    w.score += diff>0 ? 8 : -8;
+    w.aPower=Math.max(0,w.aPower-(br/(ar+br))*10);
+    w.bPower=Math.max(0,w.bPower-(ar/(ar+br))*10);
+    if(diff>0) w.progress=Math.min(100,w.progress+4+Math.random()*8); else w.progress=Math.max(0,w.progress-2);
+    if(w.progress>=100 || w.bPower<15) finishAIWar(w,w.a);
+    else if(w.progress<=0 && w.aPower<15) finishAIWar(w,w.b);
+  }
+  function tick(){
+    ensurePlayerFromSelection();
+    const list=freeAI();
+    // Каждая итерация: ИИ выбирает новые войны, но не спамит ими.
+    if(list.length>1){
+      const attempts=Math.max(1,Math.floor(list.length/18));
+      for(let i=0;i<attempts;i++){
+        if(Math.random()<.55){
+          const a=list[Math.floor(Math.random()*list.length)];
+          const enemies=list.filter(x=>x!==a && !hasWar(x));
+          if(enemies.length) startAIWar(a,enemies[Math.floor(Math.random()*enemies.length)]);
+        }
+      }
+    }
+    for(const w of [...AI.wars]){
+      if(w.done){AI.wars.splice(AI.wars.indexOf(w),1);continue;}
+      progressWar(w);
+    }
+    // Если игрок находится в войне через существующую систему, ИИ тоже может создавать давление на него.
+    if(AI.player && Math.random()<.18 && !hasWar(AI.player)){
+      const enemy=list[Math.floor(Math.random()*list.length)];
+      if(enemy) startAIWar(enemy,AI.player);
+    }
+    const status=$('worldAiStatus');
+    if(status && AI.player) status.textContent=`🌍 Вы: ${getName(AI.player)} · ИИ-государств: ${Math.max(0,AI.countries.length-1)} · активных войн в мире: ${AI.wars.length}`;
+  }
+  document.addEventListener('click',e=>{
+    const map=$('worldMap'); if(!map||!map.contains(e.target)) return;
+    const t=e.target.closest('#territories > *'); if(!t) return;
+    // Первый выбор карты считается выбором своей страны, если она ещё не определена.
+    if(!AI.player){ AI.player=t; t.classList.add('player-country'); ensurePlayerFromSelection(); }
+  },true);
+  window.addEventListener('load',()=>setTimeout(setup,500));
+  setTimeout(setup,900);
+})();
+</script>
+
+
+<div class="world-command-panel" id="worldCommandPanel">
+  <div class="panel-title">🌍 Центр управления миром</div>
+  <div class="world-ai-badge" id="worldAiBadge">🤖 Мир управляется ИИ</div>
+  <div class="world-command-tabs">
+    <button class="active" data-world-tab="news">📰 Новости</button><button data-world-tab="economy">💰 Экономика</button><button data-world-tab="build">🏗 Строительство</button><button data-world-tab="tech">🔬 Технологии</button><button data-world-tab="events">🎲 События</button>
+  </div>
+  <div id="worldCommandContent" class="world-command-content"></div>
+  <div class="world-modebar"><b style="margin-right:3px">Карта:</b><button data-map-mode="politics">Политика</button><button data-map-mode="army">Армии</button><button data-map-mode="economy">Экономика</button><button data-map-mode="population">Население</button><button data-map-mode="war">Войны</button></div>
+</div>
+
+<script id="expansion-systems">
+(()=>{
+ const $=id=>document.getElementById(id); const panel=$('worldCommandPanel'); if(!panel)return;
+ let tab='news', mapMode='politics'; let money=Number(($('moneyValue')||{}).textContent)||1000; let pop=10, stability=82; const builds={factory:0,lab:0,shipyard:0,airbase:0,fort:0}; const tech={army:1,air:1,navy:1,industry:1,rockets:0};
+ const news=['🌍 Мировая обстановка готова к развитию.','🤖 ИИ-государства самостоятельно принимают решения.'];
+ const events=['📰 Экономический рост: доход страны временно увеличен.','🔬 Учёные сообщили о технологическом прорыве.','🏭 Новая промышленная линия увеличила производство.','🛡️ Военные инженеры улучшили оборону.','🌾 Хороший урожай снизил расходы на продовольствие.'];
+ function playerName(){return ($('nationName')||{}).textContent||'Ваша страна'}
+ function render(){const c=$('worldCommandContent'); if(!c)return;
+  if(tab==='news') c.innerHTML=news.slice(0,7).map(x=>`<div class="world-news-item">${x}</div>`).join('');
+  if(tab==='economy') c.innerHTML=`<div class="world-mini-grid"><div class="world-mini-stat"><small>Казна</small><b>${Math.floor(money)} ₽</b></div><div class="world-mini-stat"><small>Население</small><b>${pop.toFixed(1)} млн</b></div><div class="world-mini-stat"><small>Стабильность</small><b>${stability}%</b></div><div class="world-mini-stat"><small>Доход</small><b>+${25+builds.factory*8} ₽/ход</b></div></div><p style="opacity:.7">Экономика меняется со временем: заводы увеличивают доход, а войны и кризисы могут его снижать.</p>`;
+  if(tab==='build'){const rows=[['factory','🏭 Завод',250,'+8 ₽/ход'],['lab','🔬 Научный центр',450,'+1 к исследованиям'],['shipyard','⚓ Верфь',500,'+1 к флоту'],['airbase','✈️ Авиабаза',600,'+1 к авиации'],['fort','🛡️ Укрепления',350,'+оборона']]; c.innerHTML=rows.map(r=>`<div class="build-row"><span>${r[1]} <small style="opacity:.55">${r[3]}</small></span><button data-build="${r[0]}" data-cost="${r[2]}">${r[2]} ₽</button></div>`).join(''); }
+  if(tab==='tech') c.innerHTML=[['army','⚔️ Сухопутные войска'],['air','✈️ Авиация'],['navy','⚓ Флот'],['industry','🏭 Промышленность'],['rockets','🚀 Ракеты']].map(r=>`<div class="tech-row"><span>${r[1]}</span><b>Уровень ${tech[r[0]]}</b><button data-tech="${r[0]}">Исследовать 300 ₽</button></div>`).join('');
+  if(tab==='events') c.innerHTML=events.slice(-5).reverse().map(x=>`<div class="world-event">${x}</div>`).join('');
+ }
+ panel.addEventListener('click',e=>{const t=e.target.closest('[data-world-tab]'); if(t){tab=t.dataset.worldTab;panel.querySelectorAll('[data-world-tab]').forEach(b=>b.classList.toggle('active',b===t));render();return} const b=e.target.closest('[data-build]'); if(b){const cost=+b.dataset.cost;if(money>=cost){money-=cost;builds[b.dataset.build]++;news.unshift(`🏗️ ${playerName()} построила объект: ${b.textContent.replace(' ₽','')}.`);news.unshift(`💰 Строительство оплачено: −${cost} ₽.`);syncMoney();render()}return} const t2=e.target.closest('[data-tech]'); if(t2){if(money>=300){money-=300;tech[t2.dataset.tech]++;news.unshift(`🔬 ${playerName()} улучшила направление «${t2.dataset.tech}».`);syncMoney();render()}return} });
+ function syncMoney(){const el=$('moneyValue');if(el)el.textContent=Math.floor(money);const stat=$('moneyStat');if(stat)stat.textContent=Math.floor(money)}
+ panel.querySelectorAll('[data-map-mode]').forEach(b=>b.addEventListener('click',()=>{mapMode=b.dataset.mapMode;news.unshift(`🗺️ Режим карты изменён: ${b.textContent}.`); const map=$('worldMap'); if(map)map.dataset.mode=mapMode; render();}));
+ setInterval(()=>{money+=25+builds.factory*8; if(Math.random()<.16){const ev=events[Math.floor(Math.random()*events.length)];events.push(ev);news.unshift(ev);stability=Math.max(35,Math.min(100,stability+(Math.random()>.5?1:-1)));} pop+=.01; if(news.length>12)news.length=12; syncMoney(); if(tab==='news'||tab==='economy'||tab==='events')render();},5000);
+ render(); syncMoney();
+})();
+</script>
 </body>
 </html>
